@@ -12,6 +12,9 @@ import math
 import time
 
 
+
+TOL = 0.5
+
 #Subscriber Publisher and Services
 mavros_arm = rospy.get_param('/mavros/cmd/arming')
 mavros_set_mode = rospy.get_param('/mavros/set_mode')
@@ -123,6 +126,11 @@ class MAV:
         
         self.set_global_pub.publish(self.drone_goal_pose)
 
+    def chegou(self):
+        if(not rospy.is_shutdown and abs(self.drone_goal_pose - self.drone_pose) > TOL):
+            return True
+        else:
+            return False
 
 if __name__ == '__main__':
     mav = MAV("jorge")
