@@ -1,3 +1,4 @@
+from inspect import modulesbyfile
 import rospy
 import mavros_msgs
 from mavros_msgs import srv
@@ -93,13 +94,13 @@ class MAV:
     
     def drone_set_mode(self, mode):
         self.set_mode(0, mode)
-        if(self.drone_state.mode != "OFFBOARD"):
-            while(self.drone_state.mode != "OFFBOARD"):
-                self.set_mode(0, "OFFBOARD")
+        if(self.drone_state.mode != mode):
+            while(self.drone_state.mode != mode):
+                self.set_mode(0, mode)
                 rate.sleep()
-            rospy.loginfo("Drone está no modo OFFBOARD!")
+            rospy.loginfo("Drone está no modo " + mode)
         else:
-            rospy.loginfo("Drone já está no modo OFFBOARD")
+            rospy.loginfo("Drone já está no modo " + mode)
 
     
     def takeoff(self):
