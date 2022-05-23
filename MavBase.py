@@ -92,11 +92,21 @@ class MAV:
         
         self.velocity_pub.publish(self.goal_vel)
     
+
+    def set_points(self):
+        x = float(input("Digita a posição em X: "))
+        y = float(input("Digite a posição em Y: "))
+        z = float(input("Digite a posição em Z: "))
+
+        self.drone_goal_pose.pose.position.x = x
+        self.drone_goal_pose.pose.position.y = y
+        self.drone_goal_pose.pose.position.z = z
+
     def drone_set_mode(self):
         for i in range(100):
             self.local_position_pub.publish(self.drone_goal_pose)
             self.rate.sleep()
-            
+
         last_request = rospy.Time.now()
         if(self.drone_state.mode != "OFFBOARD"):
             while not rospy.is_shutdown() and self.drone_state.mode != "OFFBOARD" and (rospy.Time.now() - last_request > rospy.Duration(1.0)):
@@ -107,14 +117,6 @@ class MAV:
         
     
     def takeoff(self):
-        x = float(input("Digita a posição em X: "))
-        y = float(input("Digite a posição em Y: "))
-        z = float(input("Digite a posição em Z: "))
-
-        self.drone_goal_pose.pose.position.x = x
-        self.drone_goal_pose.pose.position.y = y
-        self.drone_goal_pose.pose.position.z = z
-
         self.arm(True)
 
         if(not self.drone_state.armed):
@@ -134,6 +136,7 @@ class MAV:
 
 if __name__ == '__main__':
     mav = MAV("jorge")
+    mav.set_points()
     mav.drone_set_mode()
     mav.takeoff()
 
