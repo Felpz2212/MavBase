@@ -41,11 +41,11 @@ mavros_local_position_pub = '/mavros_local_position_pub'
 class MAV:
     rospy.init_node("GOLAND")
     def __init__(self, mav_name):
-        self.rate = rospy.Rate(60)
+        self.rate = rospy.Rate(20)
         self.battery_status = BatteryState()
         self.drone_pose = PoseStamped()
         self.drone_goal_pose = PoseStamped()
-        self.drone_state = State()
+        self.current_state = State()
         self.goal_vel = TwistStamped()
 
         #services
@@ -55,7 +55,7 @@ class MAV:
         #publishers
         self.velocity_pub = rospy.Publisher(mavros_velocity_pub, TwistStamped, queue_size=10)
         self.set_global_pub = rospy.Publisher(mavros_set_global_pub, GeoPoseStamped, queue_size=10)
-        self.local_position_pub = rospy.Publisher(mavros_local_position_pub, PoseStamped, queue_size=15)
+        self.local_position_pub = rospy.Publisher('/mavros/setpoint_position/local', PoseStamped, queue_size=10)
 
         #subscribers
         self.local_position_sub = rospy.Subscriber(mavros_local_position_sub, PoseStamped, self.local_callback)
@@ -68,16 +68,12 @@ class MAV:
         self.drone_pose.pose.position.z = local.pose.position.z
     
     def state_callback(self, state_data):
-        self.drone_state = state_data
+        self.current_state = state_data
 
     def battery_callback(self, bat_data):
         self.battery_status = bat_data
 
-    def set_position(self, x, y, z):
-        self.drone_goal_pose.pose.position.x = x
-        self.drone_goal_pose.pose.position.y = y
-        self.drone_goal_pose.pose.position.z = z
-
+    def set_position(self):
         self.local_position_pub.publish(self.drone_goal_pose)
 
 
@@ -94,54 +90,93 @@ class MAV:
     
 
     def set_points(self):
-        x = float(input("Digita a posição em X: "))
-        y = float(input("Digite a posição em Y: "))
-        z = float(input("Digite a posição em Z: "))
+        self.drone_goal_pose.pose.position.x = float(input("Digita a posição em X: "))
+        self.drone_goal_pose.pose.position.y = float(input("Digite a posição em Y: "))
+        self.drone_goal_pose.pose.position.z = float(input("Digite a posição em Z: "))
 
-        self.drone_goal_pose.pose.position.x = x
-        self.drone_goal_pose.pose.position.y = y
-        self.drone_goal_pose.pose.position.z = z
+        print("X: ", self.drone_goal_pose.pose.position.x)
+        print("Y: ", self.drone_goal_pose.pose.position.y)
+        print("Z: ", self.drone_goal_pose.pose.position.z)
 
     def drone_set_mode(self):
         for i in range(100):
             self.local_position_pub.publish(self.drone_goal_pose)
             self.rate.sleep()
-
-        last_request = rospy.Time.now()
-        if(self.drone_state.mode != "OFFBOARD"):
-            while not rospy.is_shutdown() and self.drone_state.mode != "OFFBOARD" and (rospy.Time.now() - last_request > rospy.Duration(1.0)):
-                self.set_mode(0, "OFFBOARD")
-            rospy.loginfo("Drone está no modo OFFBOARD")
-        else:
-            rospy.loginfo("Drone já está no modo OFFBOARD")
         
+        last_request = rospy.Time.now()
+        if (self.current_state.mode != "OFFBOARD"):
+            self.result = self.set_mode(0, "OFFBOARD")
+            while not rospy.is_shutdown() and self.current_state.mode != "OFFBOARD" and (rospy.Time.now() - last_request > rospy.Duration(1.0)):
+                self.result = self.set_mode(0, "OFFBOARD")
+            rospy.loginfo("Drone em modo OFFBOARD")
+        else:
+            rospy.loginfo("Drone já está em modo OFFBOARD")
     
     def armar(self):
         self.arm(True)
-
-        if not rospy.is_shutdown() and not self.drone_state.armed:
-            while(not self.drone_state.armed):
+        if not rospy.is_shutdown() and not self.current_state.armed:
+            while not rospy.is_shutdown() and not self.current_state.armed:
                 self.arm(True)
             rospy.loginfo("Drone Armado")
         else:
             rospy.loginfo("Drone já está armado")
         
-        self.local_position_pub.publish(self.drone_goal_pose)
-
-    def takeoff(self):
-        self.drone_set_mode()
-        self.armar()
-
 
     def chegou(self):
         if(not rospy.is_shutdown and abs(self.drone_goal_pose - self.drone_pose) > TOL):
             return True
         else:
             return False
+    
+    def takeoff(self):
+        self.drone_set_mode()
+        self.armar()
+        self.set_points()
+        self.set_position()
+
+        while not rospy.is_shutdown() and abs(self.drone_goal_pose.pose.position.z - self.drone_pose.pose.position.z) > TOL:
+            self.local_position_pub.publish(self.drone_goal_pose)
+            self.rate.sleep()
+
+        rospy.loginfo("Esperando")
+        t0 = rospy.Time.now()
+        while not rospy.is_shutdown() and rospy.Time.now() - t0 < rospy.Duration(5):
+            self.local_position_pub.publish(self.drone_goal_pose)
+            self.rate.sleep()
+
+        while not rospy.is_shutdown() and abs(self.drone_goal_pose.pose.position.y - self.drone_pose.pose.position.y) > TOL:
+            self.local_position_pub.publish(self.drone_goal_pose)
+            self.rate.sleep()
+        
+        rospy.loginfo("Esperando")
+        t0 = rospy.Time.now()
+        while not rospy.is_shutdown() and rospy.Time.now() - t0 < rospy.Duration(5):
+            self.local_position_pub.publish(self.drone_goal_pose)
+            self.rate.sleep()
+
+        while not rospy.is_shutdown() and abs(self.drone_goal_pose.pose.position.x - self.drone_pose.pose.position.x) > TOL:
+            self.local_position_pub.publish(self.drone_goal_pose)
+            self.rate.sleep()
+        
+        rospy.loginfo("Esperando")
+        t0 = rospy.Time.now()
+        while not rospy.is_shutdown() and rospy.Time.now() - t0 < rospy.Duration(5):
+            self.local_position_pub.publish(self.drone_goal_pose)
+            self.rate.sleep()
+
+        if not self.chegou():
+            if (self.current_state.mode != "AUTO.LAND"):
+                self.result = self.set_mode(0, "AUTO.LAND")
+                rospy.loginfo("Alterando para modo Land")
+                while not rospy.is_shutdown() and self.current_state.mode != "AUTO.LAND":
+                    self.result = self.set_mode(0, "AUTO.LAND")
+                rospy.loginfo("Drone em modo Land")
+            else:
+                rospy.loginfo("Drone já está em modo Land")
+
 
 if __name__ == '__main__':
     mav = MAV("jorge")
-    mav.set_points()
     mav.takeoff()
 
 
