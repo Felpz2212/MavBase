@@ -12,23 +12,18 @@ import math
 import time
 
 
-
 TOL = 0.5
 
 #Subscriber Publisher and Services
-mavros_arm = rospy.get_param('/mavros/cmd/arming')
-mavros_set_mode = rospy.get_param('/mavros/set_mode')
-mavros_local_atual = rospy.get_param('/mavros/setpoint_position/local')
-mavros_state_sub = rospy.get_param('mavros/state')
-mavros_local_position_sub = rospy.get_param('/mavros/local_position/pose')
-mavros_battery_state_sub = rospy.get_param('/mavros_battery_sub')
-mavros_set_global_pub = rospy.get_param('/mavros/setpoint_position/global')
-mavros_velocity_pub = rospy.get_param('/mavros/setpoint_velocity/cmd_vel')
-mavros_local_position_pub = rospy.get_param('/mavros_local_position_pub')
-
-#Definicao setpoint
-
-rate = rospy.Rate(20)
+mavros_arm = '/mavros/cmd/arming'
+mavros_set_mode = '/mavros/set_mode'
+mavros_local_atual = '/mavros/setpoint_position/local'
+mavros_state_sub = 'mavros/state'
+mavros_local_position_sub = '/mavros/local_position/pose'
+mavros_battery_state_sub = '/mavros/battery'
+mavros_set_global_pub = '/mavros/setpoint_position/global'
+mavros_velocity_pub = '/mavros/setpoint_velocity/cmd_vel'
+mavros_local_position_pub = '/mavros_local_position_pub'
 
 
 #mavros_local_position_pub    = '/mavros/setpoint_position/local'
@@ -44,7 +39,9 @@ rate = rospy.Rate(20)
 #mavros_set_global_pub        = '/mavros/setpoint_position/global'
 
 class MAV:
+    rospy.init_node("GOLAND")
     def __init__(self, mav_name):
+        self.rate = rospy.Rate(60)
         self.battery_status = BatteryState()
         self.drone_pose = PoseStamped()
         self.drone_goal_pose = PoseStamped()
@@ -53,7 +50,7 @@ class MAV:
 
         #services
         self.arm = rospy.ServiceProxy(mavros_arm, CommandBool)
-        self.set_mode = rospy.ServiceProxy(mavros_set_mode, SetMode)
+        self.set_mode = rospy.ServiceProxy('/mavros/set_mode', SetMode)
 
         #publishers
         self.velocity_pub = rospy.Publisher(mavros_velocity_pub, TwistStamped, queue_size=10)
@@ -95,16 +92,19 @@ class MAV:
         
         self.velocity_pub.publish(self.goal_vel)
     
-    def drone_set_mode(self, mode):
-        self.set_mode(0, mode)
-        if(self.drone_state.mode != mode):
-            while(self.drone_state.mode != mode):
-                self.set_mode(0, mode)
-                rate.sleep()
-            rospy.loginfo("Drone está no modo " + mode)
+    def drone_set_mode(self):
+        for i in range(100):
+            self.local_position_pub.publish(self.drone_goal_pose)
+            self.rate.sleep()
+            
+        last_request = rospy.Time.now()
+        if(self.drone_state.mode != "OFFBOARD"):
+            while not rospy.is_shutdown() and self.drone_state.mode != "OFFBOARD" and (rospy.Time.now() - last_request > rospy.Duration(1.0)):
+                self.set_mode(0, "OFFBOARD")
+            rospy.loginfo("Drone está no modo OFFBOARD")
         else:
-            rospy.loginfo("Drone já está no modo " + mode)
-
+            rospy.loginfo("Drone já está no modo OFFBOARD")
+        
     
     def takeoff(self):
         x = float(input("Digita a posição em X: "))
@@ -134,7 +134,9 @@ class MAV:
 
 if __name__ == '__main__':
     mav = MAV("jorge")
-    mav.takeoff
+    mav.drone_set_mode()
+    mav.takeoff()
+
 
 
 
