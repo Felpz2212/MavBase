@@ -54,7 +54,7 @@ class MAV:
 
         #publishers
         self.velocity_pub = rospy.Publisher(mavros_velocity_pub, TwistStamped, queue_size=10)
-        self.set_global_pub = rospy.Publisher(mavros_set_global_pub, PoseStamped, queue_size=10)
+        self.set_global_pub = rospy.Publisher(mavros_set_global_pub, GeoPoseStamped, queue_size=10)
         self.local_position_pub = rospy.Publisher(mavros_local_position_pub, PoseStamped, queue_size=15)
 
         #subscribers
@@ -116,17 +116,22 @@ class MAV:
             rospy.loginfo("Drone já está no modo OFFBOARD")
         
     
-    def takeoff(self):
+    def armar(self):
         self.arm(True)
 
-        if(not self.drone_state.armed):
+        if not rospy.is_shutdown() and not self.drone_state.armed:
             while(not self.drone_state.armed):
                 self.arm(True)
             rospy.loginfo("Drone Armado")
         else:
             rospy.loginfo("Drone já está armado")
         
-        self.set_global_pub.publish(self.drone_goal_pose)
+        self.local_position_pub.publish(self.drone_goal_pose)
+
+    def takeoff(self):
+        self.drone_set_mode()
+        self.armar()
+
 
     def chegou(self):
         if(not rospy.is_shutdown and abs(self.drone_goal_pose - self.drone_pose) > TOL):
@@ -137,7 +142,6 @@ class MAV:
 if __name__ == '__main__':
     mav = MAV("jorge")
     mav.set_points()
-    mav.drone_set_mode()
     mav.takeoff()
 
 
