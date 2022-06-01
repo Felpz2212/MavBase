@@ -181,4 +181,15 @@ class MAV:
 
 if __name__ == '__main__':
     mav = MAV("jorge")
+
     mav.mission()
+
+
+
+
+
+    
+
+
+    
+        
