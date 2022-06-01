@@ -1,4 +1,8 @@
+from ast import match_case
 from inspect import modulesbyfile
+from statistics import mode
+
+from soupsieve import match
 import rospy
 import mavros_msgs
 from mavros_msgs import srv
@@ -98,7 +102,7 @@ class MAV:
         print("Y: ", self.drone_goal_pose.pose.position.y)
         print("Z: ", self.drone_goal_pose.pose.position.z)
 
-    def drone_set_mode(self):
+    def drone_set_mode_offboard(self):
         for i in range(100):
             self.local_position_pub.publish(self.drone_goal_pose)
             self.rate.sleep()
@@ -106,7 +110,7 @@ class MAV:
         last_request = rospy.Time.now()
         if (self.current_state.mode != "OFFBOARD"):
             self.result = self.set_mode(0, "OFFBOARD")
-            while not rospy.is_shutdown() and self.current_state.mode != "OFFBOARD" and (rospy.Time.now() - last_request > rospy.Duration(1.0)):
+            while not rospy.is_shutdown() and self.current_state.mode != mode and (rospy.Time.now() - last_request > rospy.Duration(1.0)):
                 self.result = self.set_mode(0, "OFFBOARD")
             rospy.loginfo("Drone em modo OFFBOARD")
         else:
@@ -124,12 +128,12 @@ class MAV:
 
     def chegou(self):
         if(not rospy.is_shutdown and abs(self.drone_goal_pose - self.drone_pose) > TOL):
-            return True
-        else:
             return False
-    
-    def takeoff(self):
-        self.drone_set_mode()
+        else:
+            return True
+
+    def mission(self):
+        self.drone_set_mode_offboard()
         self.armar()
         self.set_points()
         self.set_position()
@@ -164,7 +168,7 @@ class MAV:
             self.local_position_pub.publish(self.drone_goal_pose)
             self.rate.sleep()
 
-        if not self.chegou():
+        if  self.chegou():
             if (self.current_state.mode != "AUTO.LAND"):
                 self.result = self.set_mode(0, "AUTO.LAND")
                 rospy.loginfo("Alterando para modo Land")
@@ -177,14 +181,4 @@ class MAV:
 
 if __name__ == '__main__':
     mav = MAV("jorge")
-    mav.takeoff()
-
-
-
-
-
-    
-
-
-    
-        
+    mav.mission()
