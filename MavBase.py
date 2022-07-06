@@ -115,9 +115,9 @@ class MAV:
     
 
     def set_points(self):
-        self.drone_goal_pose.pose.position.x = float(input("Digita a posição em X: "))
-        self.drone_goal_pose.pose.position.y = float(input("Digite a posição em Y: "))
-        self.drone_goal_pose.pose.position.z = float(input("Digite a posição em Z: "))
+        self.drone_goal_pose.pose.position.x = (self.drone_goal_pose.pose.position.x + 2)*0.5 #float(input("Digita a posição em X: "))
+        self.drone_goal_pose.pose.position.y = self.drone_goal_pose.pose.position.y + 2*1.13 #float(input("Digite a posição em Y: "))
+        self.drone_goal_pose.pose.position.z = 5
 
         print("X: ", self.drone_goal_pose.pose.position.x)
         print("Y: ", self.drone_goal_pose.pose.position.y)
@@ -147,6 +147,15 @@ class MAV:
             rospy.loginfo("Drone já está armado")
         
 
+    def desarmar(self):
+        self.arm(False)
+        if not rospy.is_shutdown() and self.current_state.armed:
+            while not rospy.is_shutdown() and self.current_state.armed:
+                self.arm(False)
+            rospy.loginfo("Drone Desarmado")
+        else:
+            rospy.loginfo("Drone já está Desarmado")
+
     def chegou(self):
         if(not rospy.is_shutdown and abs(self.drone_goal_pose - self.drone_pose) > TOL):
             return False
@@ -154,14 +163,22 @@ class MAV:
             return True
 
     def mission(self):
+
+        self.goal_vel.twist.linear.x = 0
+        self.goal_vel.twist.linear.y = 0
+        self.goal_vel.twist.linear.z = 0
+
+        self.goal_vel.twist.angular.x = 0
+        self.goal_vel.twist.angular.y = 0
+        self.goal_vel.twist.angular.z = 0
+        self.velocity_pub = rospy.Publisher(mavros_velocity_pub, TwistStamped, queue_size=10)
+
+
         self.drone_set_mode_offboard()
         self.armar()
         self.set_points()
         self.set_position()
 
-        self.drone_home.pose.position.x = self.drone_pose.pose.position.x
-        self.drone_home.pose.position.y = self.drone_pose.pose.position.y
-        self.drone_home.pose.position.z = self.drone_pose.pose.position.z
 
         while not rospy.is_shutdown() and abs(self.drone_goal_pose.pose.position.z - self.drone_pose.pose.position.z) > TOL:
             self.local_position_pub.publish(self.drone_goal_pose)
@@ -193,9 +210,10 @@ class MAV:
             self.local_position_pub.publish(self.drone_goal_pose)
             self.rate.sleep()
 
-        self.RTL()
+        
 
-        """ if self.chegou():
+        if self.chegou():
+            rospy.loginfo("Drone Descendo")
             if (self.current_state.mode != "AUTO.LAND"):
                 self.result = self.set_mode(0, "AUTO.LAND")
                 rospy.loginfo("Alterando para modo Land")
@@ -203,16 +221,32 @@ class MAV:
                    self.result = self.set_mode(0, "AUTO.LAND")
                 rospy.loginfo("Drone em modo Land")
             else:
-                rospy.loginfo("Drone já está em modo Land") """
+                rospy.loginfo("Drone já está em modo Land")
 
-        
+        self.desarmar()
+        self.rate.sleep()
+        #self.RTL()
 
     def RTL(self):
         self.drone_goal_pose.pose.position.x = self.drone_home.pose.position.x
         self.drone_goal_pose.pose.position.y = self.drone_home.pose.position.y
-        self.drone_goal_pose.pose.position.z = self.drone_home.pose.position.z
+        self.drone_goal_pose.pose.position.z = 5
+
+        self.goal_vel.twist.linear.x = 0
+        self.goal_vel.twist.linear.y = 0
+        self.goal_vel.twist.linear.z = 0
+
+        self.goal_vel.twist.angular.x = 0
+        self.goal_vel.twist.angular.y = 0
+        self.goal_vel.twist.angular.z = 0
+        self.velocity_pub = rospy.Publisher(mavros_velocity_pub, TwistStamped, queue_size=10)
+
+        self.drone_set_mode_offboard()
+        self.armar()
+        self.local_position_pub.publish(self.drone_goal_pose)
 
 
+        
         rospy.loginfo("Drone Retornando para posição inicial")
 
         while not rospy.is_shutdown() and abs(self.drone_goal_pose.pose.position.z - self.drone_pose.pose.position.z) > TOL:
@@ -256,12 +290,21 @@ class MAV:
             else:
                 rospy.loginfo("Drone já está em modo Land")
 
-
+        self.desarmar()
 
 
 if __name__ == '__main__':
     mav = MAV("robson")
 
-    mav.mission()
+    mav.drone_goal_pose.pose.position.x = 0
+    mav.drone_goal_pose.pose.position.y = 0
+    mav.drone_goal_pose.pose.position.z = 0
 
-    
+    mav.drone_home.pose.position.x = mav.drone_pose.pose.position.x
+    mav.drone_home.pose.position.y = mav.drone_pose.pose.position.y
+    mav.drone_home.pose.position.z = mav.drone_pose.pose.position.z
+
+    mav.mission()
+    mav.mission()
+    mav.mission()
+    mav.RTL()
